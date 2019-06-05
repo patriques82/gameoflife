@@ -45,7 +45,16 @@ run :: Seed -> IO ()
 run s = void $ initGame s >>= loop
 
 loop :: GameState -> IO GameState
-loop g = putStrLn (show g) >> threadDelay 1000000 >> loop (tick g)
+loop g = do
+  putStrLn (ansiClearScreen ++ ansiGoto 1 1 ++ show g)
+  threadDelay 1000000
+  loop (tick g)
+
+ansiClearScreen :: String
+ansiClearScreen = "\ESC[2J"
+
+ansiGoto :: Int -> Int -> String
+ansiGoto x y = "\ESC[" ++ show y ++ ";" ++ show x ++ "H"
 
 initGame :: Seed -> IO GameState
 initGame s = do
