@@ -50,7 +50,6 @@ neighboursTest1 = TestCase $ do
                       , 1, 0, 1
                       ]
   neighbours g 7 @?= [Dead, Live, Dead]
-  --                 [x,_,x,_,_,x]
 
 neighboursTest2 :: Test
 neighboursTest2 = TestCase $ do
@@ -65,8 +64,8 @@ neighboursTest2 = TestCase $ do
 
 overflowTest1 :: Test
 overflowTest1 = TestCase $ do
-  overflow 3 4 (3, ()) @?= True
+  hOverflow 3 4 3 @?= True
 
 overflowTest2 :: Test
 overflowTest2 = TestCase $ do
-  overflow 3 9 (10, ()) @?= True
+  hOverflow 3 9 10 @?= True

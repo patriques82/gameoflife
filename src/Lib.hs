@@ -5,7 +5,7 @@ module Lib
     , gamestate
     , tick
     , neighbours
-    , overflow
+    , hOverflow
     ) where
 
 import qualified Data.Map.Strict as M
@@ -18,8 +18,7 @@ import Control.Concurrent (threadDelay)
 
 data GameState = GameState { gWidth :: Int
                            , grid :: M.Map Pos Cell
-                           }
-  deriving Eq
+                           } deriving Eq
 
 instance Show GameState where
   show (GameState w g) =
@@ -39,7 +38,7 @@ instance Semigroup Cell where
 
 instance Show Cell where
   show Live = "x"
-  show Dead = "_"
+  show Dead = " "
 
 type Pos = Int
 
@@ -84,7 +83,7 @@ activation pred = pred . length . filter isAlive
 apply :: [Rule] -> GameState -> GameState
 apply rs g@(GameState w m) = GameState w . M.fromList $ M.foldrWithKey' f [] m
   where f pos cell xs = let cs = neighbours g pos
-                        in case mconcat (map (\(Rule f) -> f cell cs) rs) of -- ?
+                        in case mconcat (map (\(Rule f) -> f cell cs) rs) of
                              Just c  -> (pos, c):xs
                              Nothing -> (pos, cell):xs
 
@@ -97,20 +96,25 @@ mkRule start pred end = Rule $ \c' cs ->
 neighbours :: GameState -> Pos -> [Cell]
 neighbours (GameState w m) p = M.elems $ M.intersection m m'
   where
-    m' = M.fromList . filter (not . overflow w p) $ potentialNeighbours w p
+    m' = M.fromList
+        . (`zip` (repeat ()))
+        . filter (not . hOverflow w p)
+        $ potentialNeighbours w p
 
-potentialNeighbours w p = [ (p-1-w, ()), (p-w, ()), (p+1-w, ())
-                          , (p-1, ()),              (p+1, ())
-                          , (p-1+w, ()), (p+w, ()), (p+1+w, ())]
+potentialNeighbours w p = leftNeighbours w p
+                       ++ [p-w, p+w]
+                       ++ rightNeighbours w p
 
-overflow :: Int -> Pos -> (Pos, a) -> Bool
-overflow w p (p', _) = let isRightBorder = (p `mod` w) == 0
-                           isLeftBorder = ((p - 1) `mod` w) == 0
-                       in if isRightBorder
-                             then any (\p'' -> p'' == p') [p + 1, p + 1 - w, p + 1 + w]
-                             else if isLeftBorder
-                                     then any (\p'' -> p'' == p') [p - 1, p - 1 - w, p - 1 + w]
-                                     else False
+hOverflow :: Int -> Pos -> Pos -> Bool
+hOverflow w p p' =
+     isAtRightBorder w p && (any (== p') (rightNeighbours w p))
+  || isAtLeftBorder w p && (any (== p') (leftNeighbours w p))
+
+isAtRightBorder w p = (p `mod` w) == 0
+isAtLeftBorder w p = ((p - 1) `mod` w) == 0
+
+leftNeighbours w p = [ p-1-w, p-1, p-1+w ]
+rightNeighbours w p = [ p+1-w, p+1, p+1+w ]
 
 isAlive :: Cell -> Bool
 isAlive Live = True
