@@ -49,3 +49,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - gameoflife
+    - hspec
+    - hspec-contrib
+    - HUnit
