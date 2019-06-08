@@ -10,7 +10,8 @@ main = hspec $ do
     fromHUnitTest tickTests
   describe "neighbours" $ do
     fromHUnitTest neighboursTests
-
+  describe "overflow" $ do
+    fromHUnitTest overflowTests
 
 tickTests :: Test
 tickTests = TestList [ TestLabel "test1" tickTest1
@@ -22,9 +23,21 @@ neighboursTests = TestList [ TestLabel "test1" neighboursTest1
                            , TestLabel "test2" neighboursTest2
                            ]
 
+overflowTests :: Test
+overflowTests = TestList [ TestLabel "test1" overflowTest1
+                         , TestLabel "test2" overflowTest2
+                         ]
+
 tickTest1 :: Test
 tickTest1 = TestCase $ do
-  1 @?= 1
+  let g = gamestate 3 [ 1, 0, 1
+                      , 0, 1, 0
+                      , 1, 0, 1
+                      ]
+  tick g @?= gamestate 3 [ 0, 1, 0
+                         , 1, 0, 1
+                         , 0, 1, 0
+                         ]
 
 tickTest2 :: Test
 tickTest2 = TestCase $ do
@@ -32,8 +45,28 @@ tickTest2 = TestCase $ do
 
 neighboursTest1 :: Test
 neighboursTest1 = TestCase $ do
-  1 @?= 1
+  let g = gamestate 3 [ 1, 0, 1
+                      , 0, 1, 0
+                      , 1, 0, 1
+                      ]
+  neighbours g 7 @?= [Dead, Live, Dead]
+  --                 [x,_,x,_,_,x]
 
 neighboursTest2 :: Test
 neighboursTest2 = TestCase $ do
-  2 @?= 2
+  let g = gamestate 3 [ 1, 0, 1
+                      , 0, 1, 0
+                      , 1, 0, 1
+                      ]
+  neighbours g 5 @?= [ Live, Dead, Live
+                     , Dead,       Dead
+                     , Live, Dead, Live
+                     ]
+
+overflowTest1 :: Test
+overflowTest1 = TestCase $ do
+  overflow 3 4 (3, ()) @?= True
+
+overflowTest2 :: Test
+overflowTest2 = TestCase $ do
+  overflow 3 9 (10, ()) @?= True

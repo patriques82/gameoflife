@@ -3,5 +3,10 @@ module Main where
 import Lib
 
 main :: IO ()
-main = runTest
---main = run (Seed 5 5 20)
+main =
+  run $ gamestate 5 [ 0, 0, 0, 0, 0
+                    , 0, 1, 1, 1, 0
+                    , 0, 0, 0, 0, 0
+                    , 0, 0, 0, 0, 0
+                    , 0, 0, 0, 0, 0
+                    ]

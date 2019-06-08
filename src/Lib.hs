@@ -1,36 +1,34 @@
 module Lib
     ( run
-    , runTest
-    , Seed(..)
     , GameState(..)
+    , Cell(..)
+    , gamestate
     , tick
     , neighbours
+    , overflow
     ) where
 
 import qualified Data.Map.Strict as M
 import Data.List (intercalate)
 import Data.List.Split (chunksOf)
-import System.Random (randomRs, newStdGen, RandomGen)
 import Control.Monad (join, void)
 import Control.Concurrent (threadDelay)
 
 -- Types
 
-data Seed = Seed { width :: Int
-                 , height :: Int
-                 , liveCells :: Int
-                 }
-
 data GameState = GameState { gWidth :: Int
                            , grid :: M.Map Pos Cell
                            }
+  deriving Eq
 
 instance Show GameState where
   show (GameState w g) =
     intercalate "\n" . chunksOf w . join . fmap show . M.elems $ g
 
-test :: GameState -> String -> Bool
-test g s = (show g) == s
+gamestate :: Int -> [Int] -> GameState
+gamestate w = GameState w . M.fromList . zip [1..] . fmap f
+  where f 0 = Dead
+        f _ = Live
 
 data Cell = Live | Dead
   deriving Eq
@@ -40,29 +38,15 @@ instance Semigroup Cell where
   _ <> _       = Dead
 
 instance Show Cell where
-  show Live = "X"
-  show Dead = "O"
+  show Live = "x"
+  show Dead = "_"
 
 type Pos = Int
 
 -- Run
 
-runTest :: IO ()
-runTest = do
-  putStrLn (show g)
-  putStrLn (show (tick g)) --(show (test g s))
-  where g = GameState 3 (M.fromList [ (1, Live), (2, Live), (3, Dead)
-                                    , (4, Dead), (5, Dead), (6, Live)
-                                    , (7, Live), (8, Live), (9, Dead)
-                                    ])
-        s = "OXO\nOOX\nOXO"
-
-run :: Seed -> IO ()
-run s = void $ initGame s >>= loop
-
-initGame :: Seed -> IO GameState
-initGame s = newStdGen >>= \g ->
-  return $ GameState (width s) (alive g s <> dead s)
+run :: GameState -> IO ()
+run g = void $ loop g
 
 loop :: GameState -> IO GameState
 loop g = do
@@ -78,18 +62,6 @@ ansiClearScreen = "\ESC[2J"
 
 ansiGoto :: Int -> Int -> String
 ansiGoto x y = "\ESC[" ++ show y ++ ";" ++ show x ++ "H"
-
---
-
-alive :: RandomGen a => a -> Seed -> M.Map Pos Cell
-alive g s = M.fromList $ take (liveCells s) ls
-  where ls = randomRs (1, total s) g `zip` repeat Live
-
-dead :: Seed -> M.Map Pos Cell
-dead s = M.fromList $ take (total s - liveCells s) ds
-  where ds = [1..total s] `zip` repeat Dead
-
-total s = width s * height s
 
 -- Logic
 
@@ -110,8 +82,8 @@ activation :: (Int -> Bool) -> [Cell] -> Bool
 activation pred = pred . length . filter isAlive
 
 apply :: [Rule] -> GameState -> GameState
-apply rs (GameState w m) = GameState w . M.fromList $ M.foldrWithKey' f [] m
-  where f pos cell xs = let cs = neighbours w pos m
+apply rs g@(GameState w m) = GameState w . M.fromList $ M.foldrWithKey' f [] m
+  where f pos cell xs = let cs = neighbours g pos
                         in case mconcat (map (\(Rule f) -> f cell cs) rs) of -- ?
                              Just c  -> (pos, c):xs
                              Nothing -> (pos, cell):xs
@@ -122,21 +94,23 @@ mkRule start pred end = Rule $ \c' cs ->
      then Just end
      else Nothing
 
-neighbours :: Int -> Pos -> M.Map Pos Cell -> [Cell]
-neighbours w p m = M.elems . M.intersection m . M.fromList . filter (overflow w p) $ d
+neighbours :: GameState -> Pos -> [Cell]
+neighbours (GameState w m) p = M.elems $ M.intersection m m'
   where
-    d = [ (p-1-w, ()), (p-w, ()), (p+1-w, ())
-        , (p-1, ()),              (p+1, ())
-        , (p-1+w, ()), (p+w, ()), (p+1+w, ())]
+    m' = M.fromList . filter (not . overflow w p) $ potentialNeighbours w p
+
+potentialNeighbours w p = [ (p-1-w, ()), (p-w, ()), (p+1-w, ())
+                          , (p-1, ()),              (p+1, ())
+                          , (p-1+w, ()), (p+w, ()), (p+1+w, ())]
 
 overflow :: Int -> Pos -> (Pos, a) -> Bool
-overflow w p (p', _) = let isRightBorder = p `mod` w == 0
-                           isLeftBorder = p - 1 `mod` w == 0
+overflow w p (p', _) = let isRightBorder = (p `mod` w) == 0
+                           isLeftBorder = ((p - 1) `mod` w) == 0
                        in if isRightBorder
-                             then all (\p'' -> p'' /= p') [p + 1, p + 1 - w, p + 1 + w]
+                             then any (\p'' -> p'' == p') [p + 1, p + 1 - w, p + 1 + w]
                              else if isLeftBorder
-                                     then all (\p'' -> p'' /= p') [p - 1, p - 1 - w, p - 1 + w]
-                                     else True
+                                     then any (\p'' -> p'' == p') [p - 1, p - 1 - w, p - 1 + w]
+                                     else False
 
 isAlive :: Cell -> Bool
 isAlive Live = True
