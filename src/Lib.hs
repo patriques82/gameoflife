@@ -1,8 +1,8 @@
 module Lib
     ( run
-    , GameState(..)
+    , Grid(..)
     , Cell(..)
-    , gamestate
+    , grid
     , tick
     , neighbours
     , hOverflow
@@ -14,18 +14,16 @@ import Data.List.Split (chunksOf)
 import Control.Monad (join, void)
 import Control.Concurrent (threadDelay)
 
--- Types
+data Grid = Grid { width :: Int
+                 , _grid :: M.Map Pos Cell
+                 } deriving Eq
 
-data GameState = GameState { gWidth :: Int
-                           , grid :: M.Map Pos Cell
-                           } deriving Eq
-
-instance Show GameState where
-  show (GameState w g) =
+instance Show Grid where
+  show (Grid w g) =
     intercalate "\n" . chunksOf w . join . fmap show . M.elems $ g
 
-gamestate :: Int -> [Int] -> GameState
-gamestate w = GameState w . M.fromList . zip [1..] . fmap f
+grid :: Int -> [Int] -> Grid
+grid w = Grid w . M.fromList . zip [1..] . fmap f
   where f 0 = Dead
         f _ = Live
 
@@ -41,81 +39,64 @@ instance Show Cell where
   show Dead = " "
 
 type Pos = Int
+type Width = Int
 
--- Run
+run :: Grid -> IO ()
+run = void . loop
 
-run :: GameState -> IO ()
-run g = void $ loop g
-
-loop :: GameState -> IO GameState
+loop :: Grid -> IO Grid
 loop g = do
   display g
   loop (tick g)
 
-display :: GameState -> IO ()
+display :: Grid -> IO ()
 display g = do
   putStrLn (ansiClearScreen ++ ansiGoto 1 1 ++ show g)
   threadDelay 1000000
 
 ansiClearScreen = "\ESC[2J"
-
-ansiGoto :: Int -> Int -> String
 ansiGoto x y = "\ESC[" ++ show y ++ ";" ++ show x ++ "H"
 
 -- Logic
 
--- 1. Any live cell with fewer than two live neighbours dies, as if by underpopulation.
--- 2. Any live cell with two or three live neighbours lives on to the next generation.
--- 3. Any live cell with more than three live neighbours dies, as if by overpopulation.
--- 4. Any dead cell with exactly three live neighbours becomes a live cell, as if by reproduction.
-tick :: GameState -> GameState
-tick s = apply [ mkRule Live (activation (< 2)) Dead
-               , mkRule Live (activation (\n -> n == 2 || n == 3)) Live
-               , mkRule Live (activation (> 3)) Dead
-               , mkRule Dead (activation ((==) 3)) Live
-               ] s
+tick :: Grid -> Grid
+tick g@(Grid w m) = Grid w m'
+  where
+    m' = M.mapWithKey (conwaysRules g) m
 
-newtype Rule = Rule (Cell -> [Cell] -> Maybe Cell)
+conwaysRules :: Grid -> Pos -> Cell -> Cell
+conwaysRules g p c
+  | not (isAlive c) && livingNeighbours g p == 3 = Live
+  | isAlive c       && livingNeighbours g p < 2  = Dead
+  | isAlive c       && livingNeighbours g p > 3  = Dead
+  | otherwise                                    = c
 
-activation :: (Int -> Bool) -> [Cell] -> Bool
-activation pred = pred . length . filter isAlive
+livingNeighbours :: Grid -> Pos -> Int
+livingNeighbours g = length . filter isAlive . neighbours g
 
-apply :: [Rule] -> GameState -> GameState
-apply rs g@(GameState w m) = GameState w . M.fromList $ M.foldrWithKey' f [] m
-  where f pos cell xs = let cs = neighbours g pos
-                        in case mconcat (map (\(Rule f) -> f cell cs) rs) of
-                             Just c  -> (pos, c):xs
-                             Nothing -> (pos, cell):xs
+isAlive :: Cell -> Bool
+isAlive Live = True
+isAlive Dead = False
 
-mkRule :: Cell -> ([Cell] -> Bool) -> Cell -> Rule
-mkRule start pred end = Rule $ \c' cs ->
-  if start == c' && (pred cs)
-     then Just end
-     else Nothing
-
-neighbours :: GameState -> Pos -> [Cell]
-neighbours (GameState w m) p = M.elems $ M.intersection m m'
+neighbours :: Grid -> Pos -> [Cell]
+neighbours (Grid w m) p = M.elems $ M.intersection m m'
   where
     m' = M.fromList
         . (`zip` (repeat ()))
         . filter (not . hOverflow w p)
         $ potentialNeighbours w p
 
-potentialNeighbours w p = leftNeighbours w p
-                       ++ [p-w, p+w]
-                       ++ rightNeighbours w p
-
-hOverflow :: Int -> Pos -> Pos -> Bool
-hOverflow w p p' =
-     isAtRightBorder w p && (any (== p') (rightNeighbours w p))
-  || isAtLeftBorder w p && (any (== p') (leftNeighbours w p))
-
-isAtRightBorder w p = (p `mod` w) == 0
-isAtLeftBorder w p = ((p - 1) `mod` w) == 0
+potentialNeighbours :: Width -> Pos -> [Pos]
+potentialNeighbours w p = leftNeighbours w p ++ [p-w, p+w] ++ rightNeighbours w p
 
 leftNeighbours w p = [ p-1-w, p-1, p-1+w ]
+
 rightNeighbours w p = [ p+1-w, p+1, p+1+w ]
 
-isAlive :: Cell -> Bool
-isAlive Live = True
-isAlive Dead = False
+hOverflow :: Width -> Pos -> Pos -> Bool
+hOverflow w p p' = isAtRightBorder w p && any (== p') (rightNeighbours w p)
+                || isAtLeftBorder w p && any (== p') (leftNeighbours w p)
+
+isAtRightBorder w p = p `mod` w == 0
+
+isAtLeftBorder w p = (p - 1) `mod` w == 0

@@ -6,17 +6,22 @@ import Lib
 
 main :: IO ()
 main = hspec $ do
-  describe "tick" $ do
-    fromHUnitTest tickTests
+  describe "tick" $ tickTest
   describe "neighbours" $ do
     fromHUnitTest neighboursTests
   describe "overflow" $ do
     fromHUnitTest overflowTests
 
-tickTests :: Test
-tickTests = TestList [ TestLabel "test1" tickTest1
-                     , TestLabel "test2" tickTest2
-                     ]
+tickTest :: Spec
+tickTest = it "tick" $ do
+  let g = grid 3 [ 1, 0, 1
+                 , 0, 1, 0
+                 , 1, 0, 1
+                 ]
+  tick g @?= grid 3 [ 0, 1, 0
+                    , 1, 0, 1
+                    , 0, 1, 0
+                    ]
 
 neighboursTests :: Test
 neighboursTests = TestList [ TestLabel "test1" neighboursTest1
@@ -28,35 +33,20 @@ overflowTests = TestList [ TestLabel "test1" overflowTest1
                          , TestLabel "test2" overflowTest2
                          ]
 
-tickTest1 :: Test
-tickTest1 = TestCase $ do
-  let g = gamestate 3 [ 1, 0, 1
-                      , 0, 1, 0
-                      , 1, 0, 1
-                      ]
-  tick g @?= gamestate 3 [ 0, 1, 0
-                         , 1, 0, 1
-                         , 0, 1, 0
-                         ]
-
-tickTest2 :: Test
-tickTest2 = TestCase $ do
-  "hello" @?= "hello"
-
 neighboursTest1 :: Test
 neighboursTest1 = TestCase $ do
-  let g = gamestate 3 [ 1, 0, 1
-                      , 0, 1, 0
-                      , 1, 0, 1
-                      ]
+  let g = grid 3 [ 1, 0, 1
+                 , 0, 1, 0
+                 , 1, 0, 1
+                 ]
   neighbours g 7 @?= [Dead, Live, Dead]
 
 neighboursTest2 :: Test
 neighboursTest2 = TestCase $ do
-  let g = gamestate 3 [ 1, 0, 1
-                      , 0, 1, 0
-                      , 1, 0, 1
-                      ]
+  let g = grid 3 [ 1, 0, 1
+                 , 0, 1, 0
+                 , 1, 0, 1
+                 ]
   neighbours g 5 @?= [ Live, Dead, Live
                      , Dead,       Dead
                      , Live, Dead, Live
