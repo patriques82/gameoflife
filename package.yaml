@@ -1,10 +1,10 @@
 name:                gameoflife
 version:             0.1.0.0
-github:              "githubuser/gameoflife"
+github:              "patriques82/gameoflife"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2019 Author name here"
+author:              "Patrik Nygren"
+maintainer:          "patriknygren82@gmail.com"
+copyright:           "2019 Patrik Nygren"
 
 extra-source-files:
 - README.md

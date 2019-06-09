@@ -1,6 +1,5 @@
 module Lib
     ( run
-    , Grid(..)
     , Cell(..)
     , grid
     , tick
@@ -29,10 +28,6 @@ grid w = Grid w . M.fromList . zip [1..] . fmap f
 
 data Cell = Live | Dead
   deriving Eq
-
-instance Semigroup Cell where
-  Live <> Live = Live
-  _ <> _       = Dead
 
 instance Show Cell where
   show Live = "x"
